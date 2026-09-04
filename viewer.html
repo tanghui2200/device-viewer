@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>设备信息</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif;background:#f0f2f5;min-height:100vh}
+.header{background:linear-gradient(135deg,#1e3a5f 0%,#2d5a8e 100%);color:#fff;padding:20px 16px;text-align:center;position:relative}
+.header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#3b82f6,#60a5fa,#3b82f6)}
+.header h1{font-size:18px;font-weight:600;margin-bottom:4px;letter-spacing:.5px}
+.header .sub{font-size:12px;opacity:.85}
+.tabs{background:#fff;display:flex;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:10}
+.tab{flex:1;padding:12px 8px;text-align:center;font-size:13px;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:#1e3a5f;border-bottom-color:#3b82f6;font-weight:500}
+.tab svg{width:16px;height:16px;vertical-align:middle;margin-right:4px}
+.content{padding:12px}
+.card{background:#fff;border-radius:8px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card-header{padding:12px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:8px}
+.card-header .icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center}
+.card-header .icon svg{width:18px;height:18px}
+.card-header h3{font-size:14px;font-weight:600;color:#1e3a5f}
+.card-body{padding:4px 0}
+.field{display:flex;padding:10px 16px;border-bottom:1px solid #f9fafb}
+.field:last-child{border-bottom:none}
+.field .label{color:#6b7280;font-size:12px;min-width:90px;flex-shrink:0}
+.field .value{color:#111827;font-size:13px;font-weight:500;flex:1;word-break:break-all}
+.footer{text-align:center;padding:16px;color:#9ca3af;font-size:11px}
+.err{text-align:center;padding:60px 20px;color:#6b7280}
+.err-icon{width:48px;height:48px;background:#fee2e2;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
+.err-icon svg{width:24px;height:24px;stroke:#ef4444;fill:none;stroke-width:2}
+</style>
+</head>
+<body>
+<div id="app"><div class="err">正在加载...</div></div>
+<script>
+(function(){
+  try {
+    var hash = location.hash.slice(1);
+    if (!hash) { showError('无数据','二维码中未包含设备信息'); return; }
+    
+    // Base64URL → Base64 → UTF-8 → JSON
+    var b64 = hash.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var json = decodeURIComponent(escape(atob(b64)));
+    var data = JSON.parse(json);
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      showError('数据格式错误','二维码中的数据格式不正确');
+      return;
+    }
+    
+    // 查找设备名称和编号
+    var title = '', code = '';
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] === '设备名称') title = data[i][1];
+      if (data[i][0] === '设备编号') code = data[i][1];
+    }
+    document.title = title || '设备信息';
+    
+    // 字段分组（更新后的术语）
+    var basicFields = ['设备名称','设备编号','责任人'];
+    var powerFields = ['动力电源输入','动力电源输出','24V输入','24V输出'];
+    var netFields = ['网络上行','网络下行'];
+    
+    function renderGroup(fields, icon, title) {
+      var items = [];
+      for (var i = 0; i < fields.length; i++) {
+        for (var j = 0; j < data.length; j++) {
+          if (data[j][0] === fields[i]) {
+            items.push('<div class="field"><div class="label">' + esc(data[j][0]) + '</div><div class="value">' + esc(data[j][1]) + '</div></div>');
+            break;
+          }
+        }
+      }
+      // 自定义字段（不在预定义分组中的）
+      if (title === '其他信息') {
+        var defined = basicFields.concat(powerFields).concat(netFields);
+        for (var j = 0; j < data.length; j++) {
+          if (defined.indexOf(data[j][0]) === -1) {
+            items.push('<div class="field"><div class="label">' + esc(data[j][0]) + '</div><div class="value">' + esc(data[j][1]) + '</div></div>');
+          }
+        }
+      }
+      if (items.length === 0) return '';
+      return '<div class="card"><div class="card-header"><div class="icon">' + icon + '</div><h3>' + title + '</h3></div><div class="card-body">' + items.join('') + '</div></div>';
+    }
+    
+    var html = '<div class="header"><h1>' + esc(title || '设备信息') + '</h1><div class="sub">' + esc(code ? '编号：' + code : '') + '</div></div>';
+    html += '<div class="tabs"><div class="tab active">📋 信息</div><div class="tab">👤 人员</div><div class="tab">📝 登记</div><div class="tab">📊 记录</div></div>';
+    html += '<div class="content">';
+    html += renderGroup(basicFields, '<svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', '基本信息');
+    html += renderGroup(powerFields, '<svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>', '电源信息');
+    html += renderGroup(netFields, '<svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1" fill="#10b981"/><circle cx="6" cy="18" r="1" fill="#10b981"/></svg>', '网络信息');
+    html += renderGroup([], '<svg viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/></svg>', '其他信息');
+    html += '</div><div class="footer">设备二维码管理系统</div>';
+    
+    document.getElementById('app').innerHTML = html;
+  } catch(e) {
+    showError('数据解析失败','请检查二维码是否正确');
+  }
+  
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  
+  function showError(title, msg) {
+    document.getElementById('app').innerHTML = '<div class="err"><div class="err-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div style="font-weight:500;margin-bottom:4px">' + title + '</div><div style="font-size:12px">' + msg + '</div></div>';
+  }
+})();
+</script>
+</body>
+</html>
